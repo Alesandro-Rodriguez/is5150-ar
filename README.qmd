@@ -1,5 +1,5 @@
 ---
-title: "ASC Template"
+title: "Spring 2025 Project"
 format: gfm
 ---
 
