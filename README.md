@@ -1,15 +1,12 @@
-# Spring 2025 Project
+# Premier League Causal Analysis
 
 
 ## Description
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim
-veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
-commodo consequat. Duis aute irure dolor in reprehenderit in voluptate
-velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint
-occaecat cupidatat non proident, sunt in culpa qui officia deserunt
-mollit anim id est laborum.
+This project aims to analyze the causal impact of coaching changes on
+team performances during the 2023-2024 Premier League Season. Using a
+dataset of match outcomes and coaching history, the analysis will
+leverage regression techniques to infer causality.
 
 ## Project Organization
 
