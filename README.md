@@ -1,28 +1,11 @@
 # Premier League Causal Analysis
 
-
 ## Description
 
 This project aims to analyze the causal impact of coaching changes on
 team performances during the 2023-2024 Premier League Season. Using a
 dataset of match outcomes and coaching history, the analysis will
 leverage regression techniques to infer causality.
-
-## Project Organization
-
-- `/code` Scripts with prefixes (e.g., `01_import-data.py`,
-  `02_clean-data.py`) and functions in `/code/src`.
-- `/data` Simulated and real data, the latter not pushed.
-- `/figures` PNG images and plots.
-- `/output` Output from model runs, not pushed.
-- `/presentations` Presentation slides.
-- `/private` A catch-all folder for miscellaneous files, not pushed.
-- `/writing` Reports, posts, and case studies.
-- `/.venv` Hidden project library, not pushed.
-- `.gitignore` Hidden Git instructions file.
-- `.python-version` Hidden Python version for the reproducible
-  environment.
-- `requirements.txt` Information on the reproducible environment.
 
 ## The Story
 
@@ -105,6 +88,22 @@ examines whether these changes improve team performance or if outcomes
 are primarily driven by other factors, such as team quality or opponent
 difficulty. By controlling for these variables, the analysis aims to
 estimate the true impact of coaching changes.
+
+## Project Organization
+
+- `/code` Scripts with prefixes (e.g., `01_import-data.py`,
+  `02_clean-data.py`) and functions in `/code/src`.
+- `/data` Simulated and real data, the latter not pushed.
+- `/figures` PNG images and plots.
+- `/output` Output from model runs, not pushed.
+- `/presentations` Presentation slides.
+- `/private` A catch-all folder for miscellaneous files, not pushed.
+- `/writing` Reports, posts, and case studies.
+- `/.venv` Hidden project library, not pushed.
+- `.gitignore` Hidden Git instructions file.
+- `.python-version` Hidden Python version for the reproducible
+  environment.
+- `requirements.txt` Information on the reproducible environment.
 
 ## Reproducible Environment
 
