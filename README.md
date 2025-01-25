@@ -1,5 +1,6 @@
 # Premier League Causal Analysis
 
+
 ## Description
 
 This project aims to analyze the causal impact of coaching changes on
@@ -88,6 +89,8 @@ examines whether these changes improve team performance or if outcomes
 are primarily driven by other factors, such as team quality or opponent
 difficulty. By controlling for these variables, the analysis aims to
 estimate the true impact of coaching changes.
+
+<img src="figures/Causal_Inference_dag.png" data-fig-align="center" />
 
 ## Project Organization
 

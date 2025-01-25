@@ -58,6 +58,8 @@ The analysis includes variables like:
 ## Theory
 Coaching changes are typically a response to poor results. This project examines whether these changes improve team performance or if outcomes are primarily driven by other factors, such as team quality or opponent difficulty. By controlling for these variables, the analysis aims to estimate the true impact of coaching changes.
 
+![](figures/Causal_Inference_dag.png){fig-align="center"}
+
 ## Project Organization
 
 - `/code` Scripts with prefixes (e.g., `01_import-data.py`, `02_clean-data.py`) and functions in `/code/src`.
