@@ -159,13 +159,14 @@ overfitting:
 ### Step 1: Identify Confounding Paths
 
 Confounding paths from Coach Change to Points include: - Coach Change →
-Team_Strength → Points - Coach Change → Match_Location → Points
+Team_Strength → Points
 
 ### Step 2: Block Confounding Paths
 
-We block these paths by including: - Team_Strength: Accounts for team
-quality. - Opponent_Strength: Adjusts for opposing team difficulty. -
-Match_Location: Controls for home/away performance differences.
+We block these paths by including: - **Team_Strength**: Accounts for
+team quality. - **Opponent_Strength**: Adjusts for opposing team
+difficulty. - **Match_Location**: Controls for home/away performance
+differences.
 
 ### Step 3: Exclude Non-Critical Variables
 
