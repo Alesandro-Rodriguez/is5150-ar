@@ -1,5 +1,5 @@
 ---
-title: "Premier League Coaching Changes: Causal Inference Project"
+title: "Premier League Coaching Changes"
 author: "Alesandro Rodriguez"
 format: revealjs
 ---
@@ -7,13 +7,16 @@ format: revealjs
 ## Introduction
 
 - **Objective**: Analyze the causal impact of coaching changes on team performance during the 2023-2024 Premier League season.
-- **Approach**: Use match outcomes, coaching history, and regression techniques to infer causality.
+- **Approach**: Use match outcomes, coaching history, and techniques learned in class to infer causality.
 
 ---
 
 ## Background Info
 
-Why this project?
+Why this project?  
+- Coaching changes are common in football, often seen as a way to improve performance.  
+- However, does replacing a coach actually improve results?  
+- I want to explore if mid-season coaching changes impact match performance or if other factors (e.g., squad quality) are more influential.
 
 ---
 
@@ -22,15 +25,16 @@ Why this project?
 - Do mid-season coaching changes improve team performance?
 - Are coaching changes a reactive measure to underperformance or a strategic performance booster?
 - What role do team strength and opponent strength play?
+- Does the timing of a coaching change (before, mid, or late season) matter?
 
 ---
 
-## Data Sources
+## Data Source Brainstorm
 
 - **Match Outcomes**: Dates, results, goals scored, match location.
 - **Coaching Changes**: Coaching transitions across the season.
 - **Additional Factors**:
-  - **Team Strength**: Squad market value.
+  - **Team Strength**: Squad market value (proxy for team quality).
   - **Opponent Strength**: Opposing team's squad value.
   - **Match Context**: Home vs. away games and timing relative to the coaching change.
 
@@ -38,7 +42,7 @@ Why this project?
 
 ## DAG (Causal Model)
 
-figure out how to show image again...
+Show Figure
 
 ---
 
@@ -53,27 +57,64 @@ figure out how to show image again...
 
 ---
 
-## Simulated Data (maybe we will include)
+## Identification Strategy expanded
 
-import numpy as np
-import polars as pl
+- **Causal Pathway**:
+  - The main assumption is that coaching changes affect team performance through Team Strength.
+  - Opponent Strength is included because stronger opponents lower the chances of earning points.
+  - Match Location matters since teams tend to perform better at home.
 
-np.random.seed(42)
+---
 
-beta0, beta1, beta2, beta3, beta4 = 3, 2, 5, -3, 1
-n = 1000
-noise_sd = 2
+- **Why Not Control for Everything?**
+  - Start_Date & End_Date are treatment variables that define when a coaching change happens—conditioning on them would introduce bias.
+  - HomeTeam & AwayTeam are unnecessary since Team Strength already accounts for team quality.
 
-sim_data = (
-    pl.DataFrame({
-        "CoachChange": np.random.choice([0, 1], size=n),
-        "Opponent_Strength": np.random.uniform(50, 100, size=n),
-        "Match_Location": np.random.choice([0, 1], size=n)
-    })
-    .with_columns([
-        (beta0 + beta1 * pl.col("CoachChange") + np.random.normal(0, noise_sd, size=n)).alias("Team_Strength")
-    ])
-    .with_columns([
-        (beta2 * pl.col("Team_Strength") + beta3 * pl.col("Opponent_Strength") + beta4 * pl.col("Match_Location") + np.random.normal(0, noise_sd, size=n)).alias("Points")
-    ])
-)
+---
+
+- **Backdoor Criterion Satisfied**:
+  - By adjusting for Team_Strength, Opponent_Strength, and Match_Location, we block confounding paths and isolate the causal effect of CoachChange on Points.
+
+---
+
+## Simulated Data 
+
+Show File
+
+---
+
+## Outcome
+
+- The simulation was designed based on real-world causal assumptions.  
+- CoachChange → Team_Strength → Points: We assumed coaching changes influence team performance through squad strength.  
+- Opponent Strength & Match Location: Added as key controls since stronger opponents and home advantage affect outcomes.  
+
+---
+
+- Observations:
+  - The CoachChange coefficient was underestimated, meaning its impact is likely absorbed by Team_Strength.
+  - Team_Strength and Opponent_Strength had the most predictive power.
+
+---
+
+## EDA 
+
+Show EDA
+
+---
+
+## Outcome
+
+- Team Strength correlates with better performance, while stronger opponents reduce expected points.
+- Coaching changes appear to be more reactive than proactive, with mid-season changes associated with lower median points.
+- Points distribution aligns with expected league behavior (3 for win, 1 for draw, 0 for loss).
+- Few teams change coaches mid-season, making it difficult to isolate effects without deeper analysis.
+
+---
+
+## Next Steps
+
+- **Review data set** and possibly adjust the columns I added. I am a bit unsure if that's how I want to measure them.  
+- **Estimate causal effect** using our example from Monday's class.   
+
+

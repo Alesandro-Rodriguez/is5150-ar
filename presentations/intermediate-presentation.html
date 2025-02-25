@@ -11,7 +11,7 @@
   <meta name="generator" content="quarto-1.5.55">
 
   <meta name="author" content="Alesandro Rodriguez">
-  <title>Premier League Coaching Changes: Causal Analysis</title>
+  <title>Premier League Coaching Changes</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -326,7 +326,7 @@
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Premier League Coaching Changes: Causal Analysis</h1>
+  <h1 class="title">Premier League Coaching Changes</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -341,12 +341,15 @@ Alesandro Rodriguez
 <h2>Introduction</h2>
 <ul>
 <li><strong>Objective</strong>: Analyze the causal impact of coaching changes on team performance during the 2023-2024 Premier League season.</li>
-<li><strong>Approach</strong>: Use match outcomes, coaching history, and regression techniques to infer causality.</li>
+<li><strong>Approach</strong>: Use match outcomes, coaching history, and techniques learned in class to infer causality.</li>
 </ul>
 </section>
 <section id="background-info" class="slide level2">
 <h2>Background Info</h2>
-<p>Why this project?</p>
+<p>Why this project?<br>
+- Coaching changes are common in football, often seen as a way to improve performance.<br>
+- However, does replacing a coach actually improve results?<br>
+- I want to explore if mid-season coaching changes impact match performance or if other factors (e.g., squad quality) are more influential.</p>
 </section>
 <section id="the-research-question" class="slide level2">
 <h2>The Research Question</h2>
@@ -354,16 +357,17 @@ Alesandro Rodriguez
 <li>Do mid-season coaching changes improve team performance?</li>
 <li>Are coaching changes a reactive measure to underperformance or a strategic performance booster?</li>
 <li>What role do team strength and opponent strength play?</li>
+<li>Does the timing of a coaching change (before, mid, or late season) matter?</li>
 </ul>
 </section>
-<section id="data-sources" class="slide level2">
-<h2>Data Sources</h2>
+<section id="data-source-brainstorm" class="slide level2">
+<h2>Data Source Brainstorm</h2>
 <ul>
 <li><strong>Match Outcomes</strong>: Dates, results, goals scored, match location.</li>
 <li><strong>Coaching Changes</strong>: Coaching transitions across the season.</li>
 <li><strong>Additional Factors</strong>:
 <ul>
-<li><strong>Team Strength</strong>: Squad market value.</li>
+<li><strong>Team Strength</strong>: Squad market value (proxy for team quality).</li>
 <li><strong>Opponent Strength</strong>: Opposing team’s squad value.</li>
 <li><strong>Match Context</strong>: Home vs.&nbsp;away games and timing relative to the coaching change.</li>
 </ul></li>
@@ -371,26 +375,95 @@ Alesandro Rodriguez
 </section>
 <section id="dag-causal-model" class="slide level2">
 <h2>DAG (Causal Model)</h2>
+<p>Show Figure</p>
 </section>
 <section id="identification-strategy" class="slide level2">
 <h2>Identification Strategy</h2>
 <ul>
-<li><strong>Outcome Variable</strong>: <code>Points</code> (3 for a win, 1 for a draw, 0 for a loss)</li>
+<li><strong>Outcome Variable</strong>: Points (3 for a win, 1 for a draw, 0 for a loss)</li>
 <li><strong>Key Adjustment Variables</strong>:
 <ul>
-<li><code>Team_Strength</code> (Squad value)</li>
-<li><code>Opponent_Strength</code> (Strength of opposing team)</li>
-<li><code>Match_Location</code> (Home vs.&nbsp;away)</li>
+<li>Team_Strength (Squad value)</li>
+<li>Opponent_Strength (Strength of opposing team)</li>
+<li>Match_Location (Home vs.&nbsp;away)</li>
 </ul></li>
-<li><strong>Exclusions</strong>: <code>Start_Date</code>, <code>End_Date</code>, <code>HomeTeam</code>, <code>AwayTeam</code></li>
+<li><strong>Exclusions</strong>: Start_Date, End_Date, HomeTeam, AwayTeam</li>
+</ul>
+</section>
+<section id="identification-strategy-expanded" class="slide level2">
+<h2>Identification Strategy expanded</h2>
+<ul>
+<li><strong>Causal Pathway</strong>:
+<ul>
+<li>The main assumption is that coaching changes affect team performance through Team Strength.</li>
+<li>Opponent Strength is included because stronger opponents lower the chances of earning points.</li>
+<li>Match Location matters since teams tend to perform better at home.</li>
+</ul></li>
+</ul>
+</section>
+<section class="slide level2">
+
+<ul>
+<li><strong>Why Not Control for Everything?</strong>
+<ul>
+<li>Start_Date &amp; End_Date are treatment variables that define when a coaching change happens—conditioning on them would introduce bias.</li>
+<li>HomeTeam &amp; AwayTeam are unnecessary since Team Strength already accounts for team quality.</li>
+</ul></li>
+</ul>
+</section>
+<section class="slide level2">
+
+<ul>
+<li><strong>Backdoor Criterion Satisfied</strong>:
+<ul>
+<li>By adjusting for Team_Strength, Opponent_Strength, and Match_Location, we block confounding paths and isolate the causal effect of CoachChange on Points.</li>
+</ul></li>
 </ul>
 </section>
 <section id="simulated-data" class="slide level2">
 <h2>Simulated Data</h2>
-<p>import numpy as np import polars as pl</p>
-<p>np.random.seed(42)</p>
-<p>beta0, beta1, beta2, beta3, beta4 = 3, 2, 5, -3, 1 n = 1000 noise_sd = 2</p>
-<p>sim_data = ( pl.DataFrame({ “CoachChange”: np.random.choice([0, 1], size=n), “Opponent_Strength”: np.random.uniform(50, 100, size=n), “Match_Location”: np.random.choice([0, 1], size=n) }) .with_columns([ (beta0 + beta1 * pl.col(“CoachChange”) + np.random.normal(0, noise_sd, size=n)).alias(“Team_Strength”) ]) .with_columns([ (beta2 * pl.col(“Team_Strength”) + beta3 * pl.col(“Opponent_Strength”) + beta4 * pl.col(“Match_Location”) + np.random.normal(0, noise_sd, size=n)).alias(“Points”) ]) )</p>
+<p>Show File</p>
+</section>
+<section id="outcome" class="slide level2">
+<h2>Outcome</h2>
+<ul>
+<li>The simulation was designed based on real-world causal assumptions.<br>
+</li>
+<li>CoachChange → Team_Strength → Points: We assumed coaching changes influence team performance through squad strength.<br>
+</li>
+<li>Opponent Strength &amp; Match Location: Added as key controls since stronger opponents and home advantage affect outcomes.</li>
+</ul>
+</section>
+<section class="slide level2">
+
+<ul>
+<li>Observations:
+<ul>
+<li>The CoachChange coefficient was underestimated, meaning its impact is likely absorbed by Team_Strength.</li>
+<li>Team_Strength and Opponent_Strength had the most predictive power.</li>
+</ul></li>
+</ul>
+</section>
+<section id="eda" class="slide level2">
+<h2>EDA</h2>
+<p>Show EDA</p>
+</section>
+<section id="outcome-1" class="slide level2">
+<h2>Outcome</h2>
+<ul>
+<li>Team Strength correlates with better performance, while stronger opponents reduce expected points.</li>
+<li>Coaching changes appear to be more reactive than proactive, with mid-season changes associated with lower median points.</li>
+<li>Points distribution aligns with expected league behavior (3 for win, 1 for draw, 0 for loss).</li>
+<li>Few teams change coaches mid-season, making it difficult to isolate effects without deeper analysis.</li>
+</ul>
+</section>
+<section id="next-steps" class="slide level2">
+<h2>Next Steps</h2>
+<ul>
+<li><strong>Review data set</strong> and possibly adjust the columns I added. I am a bit unsure if that’s how I want to measure them.<br>
+</li>
+<li><strong>Estimate causal effect</strong> using our example from Monday’s class.</li>
+</ul>
 <div class="quarto-auto-generated-content">
 <div class="footer footer-default">
 
