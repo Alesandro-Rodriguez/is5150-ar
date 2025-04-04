@@ -3,6 +3,7 @@ import polars as pl
 import pymc as pm
 import arviz as az
 
+
 np.random.seed(42)
 
 #set parameters
