@@ -112,7 +112,7 @@
         "\n",
         "---\n"
       ],
-      "id": "51c24653"
+      "id": "78aa429f"
     },
     {
       "cell_type": "code",
@@ -172,7 +172,7 @@
         "print(f\"True Intercept: {beta0}\")\n",
         "print(f\"True Coefficients: {beta1}, {beta2}, {beta3}, {beta4}\")"
       ],
-      "id": "a249c1c8",
+      "id": "5516b43b",
       "execution_count": null,
       "outputs": []
     },
@@ -182,7 +182,7 @@
       "source": [
         "---\n"
       ],
-      "id": "5001e4d0"
+      "id": "b772d989"
     },
     {
       "cell_type": "code",
@@ -213,7 +213,7 @@
         "print(\"\\nSummary Statistics:\")\n",
         "print(df.describe())"
       ],
-      "id": "661bf46c",
+      "id": "f99b3214",
       "execution_count": null,
       "outputs": []
     },
@@ -270,7 +270,7 @@
         "plt.xticks(rotation=45)\n",
         "plt.show()"
       ],
-      "id": "8185dab9",
+      "id": "47eebce8",
       "execution_count": null,
       "outputs": []
     },
@@ -301,7 +301,7 @@
         "\n",
         "## Estimate Causal Effect"
       ],
-      "id": "b1b6c943"
+      "id": "25ee7283"
     },
     {
       "cell_type": "code",
@@ -347,7 +347,7 @@
         "# Visualize posterior distributions\n",
         "az.plot_trace(idata, combined=True)"
       ],
-      "id": "5c10cda3",
+      "id": "8c40704f",
       "execution_count": null,
       "outputs": []
     },
@@ -360,7 +360,7 @@
         "## Intermediate Slide Presentation\n",
         "See my intermediate presentation [slides]https://github.com/Alesandro-Rodriguez/is5150-ar/blob/main/presentations/intermediate-presentation.html"
       ],
-      "id": "0ddc2524"
+      "id": "c4f530e8"
     }
   ],
   "metadata": {
