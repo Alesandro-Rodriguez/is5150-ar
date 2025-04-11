@@ -106,7 +106,7 @@ estimate the true impact of coaching changes.
 
 ## DAG
 
-<img src="../figures/UpdatedDag.png" data-fig-align="center" />
+<img src="../figures/FinalDag.png" data-fig-align="center" />
 
 ------------------------------------------------------------------------
 
