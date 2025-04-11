@@ -384,3 +384,116 @@ az.plot_trace(idata, combined=True)
 
 See my intermediate presentation
 \[slides\]https://github.com/Alesandro-Rodriguez/is5150-ar/blob/main/presentations/intermediate-presentation.html
+
+------------------------------------------------------------------------
+
+## Conjoint Analysis
+
+As a supplemental milestone, I conducted a conjoint analysis survey to
+explore how people prioritize different soccer team management
+strategies. The goal was to better understand how strategic
+decisions—such as how a team is built, trained, and managed—shape
+perceptions of team performance. This ties back to the larger theme of
+evaluating interventions in soccer, with coaching changes being one
+example.
+
+The survey asked respondents to choose between hypothetical team
+profiles. Each profile varied along five key attributes: squad selection
+strategy, training approach, match strategy, use of technology, and
+player conditioning.
+
+### Attribute importance
+
+Squad selection was the most influential attribute in respondents’
+choices, accounting for over 40% of decision weight. Match strategy was
+next, followed by tech usage and training approach. Player conditioning
+was considered the least important.
+
+<img src="../figures/CBC1%20-%20Attribute%20importance%20Chart.png"
+data-fig-align="center" />
+
+### Squad selection
+
+Data-driven scouting was the most preferred option by a wide margin.
+Youth academy focus and superstar transfers were also viewed positively,
+while fan-voted player signings were rated the least effective.
+
+<img src="../figures/CBC1%20-%20Squad%20Selection%20Chart.png"
+data-fig-align="center" />
+
+### Training approach
+
+Respondents favored high-intensity workloads. Rest and recovery-focused
+approaches received negative scores, suggesting performance was
+prioritized over recovery. Traditional and AI-optimized training had
+little effect either way.
+
+<img src="../figures/CBC1%20-%20Training%20Approach%20Chart.png"
+data-fig-align="center" />
+
+### Match strategy
+
+Possession-based play was the top tactical preference. High-press
+strategies were somewhat favored, while counter-attacks and
+defensive-focused play (park-the-bus) were seen as undesirable.
+
+<img src="../figures/CBC1%20-%20Match%20Strategy%20Chart.png"
+data-fig-align="center" />
+
+### Tech usage
+
+Real-time opponent analysis had the highest score. Wearable performance
+tracking also scored positively. On the other hand, AI-powered
+substitutions were rated very negatively, suggesting skepticism toward
+automation in in-game decisions.
+
+<img src="../figures/CBC1%20-%20Tech%20Usage%20Chart.png"
+data-fig-align="center" />
+
+### Player conditioning
+
+The most preferred approaches were self-regulated by players and
+year-round intensive training. Recovery-first and strict rotation
+systems scored negatively, further indicating a leaning toward
+performance over rest.
+
+<img src="../figures/CBC1%20-%20Player%20Conditioning%20Chart.png"
+data-fig-align="center" />
+
+### Summary
+
+This analysis provides an early look at how different types of team
+management decisions are perceived. While coaching changes are the focal
+point of the main project, this exercise highlights that how a team is
+built and managed—particularly in terms of squad strategy and
+tactics—carries significant weight in how people judge potential
+performance. It also shows hesitation around relying too heavily on
+automation and AI in match-day decisions.
+
+------------------------------------------------------------------------
+
+## Difference-in-Differences Consideration
+
+One method I considered for estimating the impact of coaching changes
+was the difference-in-differences (DiD) strategy. This approach compares
+changes in outcomes for a treatment group (teams with a coaching change)
+and a control group (teams without a change) over time. The goal is to
+isolate the effect of the intervention by observing how the two groups
+evolve from a shared baseline to a shared post-treatment period.
+
+In the context of the Premier League, however, DiD presents some
+limitations. Matches occur on different days and coaching changes happen
+at various points in the season. As a result, there is no uniform pre-
+and post-period that applies to all teams. This violates one of DiD’s
+core requirements: a clearly defined and consistent treatment time.
+Additionally, the parallel trends assumption—expecting both groups to
+follow similar trajectories in the absence of treatment—is unlikely to
+hold given the competitive structure and variability in matchups across
+the season.
+
+### Summary
+
+While DiD is commonly used in policy and economics studies, I don’t
+think this aligns well with this project. The variation in timing and
+complexity of scheduling in professional soccer introduces challenges
+that make this approach less suitable.
