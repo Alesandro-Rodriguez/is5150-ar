@@ -125,30 +125,35 @@ changes.
 ### Where We Are Going
 
 The goal of this milestone is to specify an identification strategy that
-ensures: - Key confounding variables are included to satisfy the
-**backdoor criterion**. - Irrelevant variables are excluded to
-streamline the model. - Decisions are based on sound **causal
-assumptions** supported by the DAG.
+ensures:
+
+- Key confounding variables are included to satisfy the **backdoor
+  criterion**
+- Irrelevant variables are excluded to streamline the model
+- Decisions are based on sound **causal assumptions** supported by the
+  DAG
 
 ### Variables to Include Based on the DAG
 
-- **Team Strength**: Captures the quality of the team, which influences
-  both the likelihood of a coaching change and performance outcomes.
-- **Opponent Strength**: Reflects the difficulty of the opposing team,
-  which impacts match outcomes and adjusts for match context.
-- **Match Location**: Accounts for the home or away setting, which
-  influences team performance.
 - **Date**: Controls for temporal trends and seasonality, such as
-  early-season vs. late-season effects.
+  early-season vs. late-season effects, which may influence both
+  coaching changes and performance
+- **Venue**: Captures whether the match was played at home or away,
+  which is a key contextual factor that affects both coaching decisions
+  and outcomes
 
 ### Variables to Exclude Based on the DAG
 
+- **Team Strength**: A mediator through which coaching changes influence
+  performance. Conditioning on it would block part of the causal pathway
+- **Opponent Strength**: Also influenced by team dynamics and may serve
+  as a mediator; excluding it preserves the total effect
 - **Start_Date and End_Date**: These are part of the treatment
-  definition (coaching change) and should not be conditioned on
-  directly.
+  definition (used to determine when coaching changes occur) and should
+  not be conditioned on directly
 - **HomeTeam and AwayTeam**: Team identity is indirectly captured by
-  **Team Strength**.
-- **Points**: As the outcome variable, it should not be conditioned on.
+  **Team Strength**
+- **Points**: As the outcome variable, it should not be conditioned on
 
 ------------------------------------------------------------------------
 
@@ -157,55 +162,52 @@ assumptions** supported by the DAG.
 
 import numpy as np
 import polars as pl
-import seaborn as sns
 from sklearn.linear_model import LinearRegression
 
 np.random.seed(42)
 
-# True parameter values
-beta0 = 3   # Intercept
-beta1 = 2   # Effect of CoachChange
-beta2 = 5   # Effect of Team_Strength
-beta3 = -3  # Effect of Opponent_Strength
-beta4 = 1   # Effect of Match_Location
-n = 1000    # Sample size
-noise_sd = 2  # Standard deviation of random noise
+# True parameters
+beta0 = 3       # Intercept
+beta1 = 2       # Effect of CoachChange
+beta2 = 1.5     # Effect of Date (e.g., time in season)
+beta3 = 1       # Effect of Venue (1 = Home, 0 = Away)
+n = 1000
+noise_sd = 2
 
-# Simulate predictors directly
+# Simulate confounders and treatment
 sim_data = pl.DataFrame({
-    "CoachChange": np.random.choice([0, 1], size=n), 
-    "Team_Strength": np.random.uniform(50, 100, size=n),
-    "Opponent_Strength": np.random.uniform(50, 100, size=n),
-    "Match_Location": np.random.choice([0, 1], size=n)
+    "Date": np.random.uniform(1, 38, size=n),  # Simulating matchweek (1 to 38)
+    "Venue": np.random.choice([0, 1], size=n),  # 0 = Away, 1 = Home
 })
 
-# Simulate the outcome variable (Points) directly
+# Simulate CoachChange with some dependency on Date
+sim_data = sim_data.with_columns(
+    (pl.col("Date") > 19).cast(int).alias("CoachChange")  # More likely in mid/late season
+)
+
+# Simulate Points based on CoachChange + confounders
 sim_data = sim_data.with_columns([
     (
         beta0
         + beta1 * pl.col("CoachChange")
-        + beta2 * pl.col("Team_Strength")
-        + beta3 * pl.col("Opponent_Strength")
-        + beta4 * pl.col("Match_Location")
+        + beta2 * pl.col("Date")
+        + beta3 * pl.col("Venue")
         + np.random.normal(0, noise_sd, size=n)
     ).alias("Points")
 ])
 
-# Prepare the data for regression
-X = sim_data.select(["CoachChange", "Team_Strength", "Opponent_Strength", "Match_Location"]).to_numpy()
+# Prepare for regression
+X = sim_data.select(["CoachChange", "Date", "Venue"]).to_numpy()
 y = sim_data["Points"].to_numpy()
 
-# Fit the linear model
+# Fit linear model
 model = LinearRegression(fit_intercept=True)
 model.fit(X, y)
 
-# Print the coefficients
-print(f"Intercept: {model.intercept_}")
-print(f"Coefficients: {model.coef_}")
-
-# Compare to true parameter values
-print(f"True Intercept: {beta0}")
-print(f"True Coefficients: {beta1}, {beta2}, {beta3}, {beta4}")
+# Print estimated vs. true
+print(f"Estimated Intercept: {model.intercept_:.2f}")
+print(f"Estimated Coefficients: {model.coef_}")
+print(f"True Coefficients: [CoachChange: {beta1}, Date: {beta2}, Venue: {beta3}]")
 ```
 
 ------------------------------------------------------------------------
@@ -341,15 +343,26 @@ import numpy as np
 import pandas as pd
 import pymc as pm
 import arviz as az
+from sklearn.preprocessing import StandardScaler
 
 # Load dataset
 df = pd.read_csv("/Users/alesandro/Downloads/matches_corrected.csv")
 
-# Convert 'Venue' to numeric (1 for Home, 0 for Away)
+# Convert 'Venue' to numeric (1 = Home, 0 = Away)
 df["Venue"] = df["Venue"].map({"Home": 1, "Away": 0})
 
-# Prepare data (predictors and outcome)
-X = df[["CoachChange", "Team_Strength", "Opponent_Strength", "Venue"]].to_numpy()
+# Convert 'Date' to numeric
+df["Date_numeric"] = pd.to_datetime(df["Date"], format="%m/%d/%Y").astype(int) / 10**9
+
+# Extract predictors
+X_raw = df[["CoachChange", "Date_numeric", "Venue"]].copy()
+
+# Standardize 'Date_numeric' and 'Venue', but leave 'CoachChange' as-is
+scaler = StandardScaler()
+X_raw[["Date_numeric", "Venue"]] = scaler.fit_transform(X_raw[["Date_numeric", "Venue"]])
+
+# Final arrays
+X = X_raw.to_numpy()
 y = df["Points"].to_numpy()
 
 # Bayesian model
@@ -359,22 +372,22 @@ with pm.Model() as coaching_model:
     y_data = pm.Data("y_data", y)
 
     # Priors
-    alpha = pm.Normal("alpha", mu=0, sigma=1)  # Intercept
-    beta = pm.Normal("beta", mu=0, sigma=1, shape=4)  # One for each predictor
-    sigma = pm.Exponential("sigma", lam=1)  # Standard deviation of error term
+    alpha = pm.Normal("alpha", mu=0, sigma=10)
+    beta = pm.Normal("beta", mu=0, sigma=5, shape=X.shape[1])
+    sigma = pm.Exponential("sigma", lam=1)
 
     # Likelihood
     mu = alpha + pm.math.dot(X_data, beta)
     y_obs = pm.Normal("y_obs", mu=mu, sigma=sigma, observed=y_data)
 
-    # Sample from the posterior
-    idata = pm.sample(1000, tune=1000, return_inferencedata=True)
+    # Sampling
+    idata = pm.sample(1000,tune=1000,return_inferencedata=True,target_accept=0.95,cores=1)
 
-# Summarize posterior estimates
+# Posterior summary
 summary = az.summary(idata, round_to=2)
 print(summary)
 
-# Visualize posterior distributions
+# Trace plots
 az.plot_trace(idata, combined=True)
 ```
 

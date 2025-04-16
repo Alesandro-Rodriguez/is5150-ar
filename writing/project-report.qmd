@@ -88,77 +88,76 @@ The objective of this project is to analyze the causal impact of coaching change
 
 ### Where We Are Going
 The goal of this milestone is to specify an identification strategy that ensures:
-- Key confounding variables are included to satisfy the **backdoor criterion**.
-- Irrelevant variables are excluded to streamline the model.
-- Decisions are based on sound **causal assumptions** supported by the DAG.
+
+- Key confounding variables are included to satisfy the **backdoor criterion**
+- Irrelevant variables are excluded to streamline the model
+- Decisions are based on sound **causal assumptions** supported by the DAG
 
 ### Variables to Include Based on the DAG
-- **Team Strength**: Captures the quality of the team, which influences both the likelihood of a coaching change and performance outcomes.
-- **Opponent Strength**: Reflects the difficulty of the opposing team, which impacts match outcomes and adjusts for match context.
-- **Match Location**: Accounts for the home or away setting, which influences team performance.
-- **Date**: Controls for temporal trends and seasonality, such as early-season vs. late-season effects.
+- **Date**: Controls for temporal trends and seasonality, such as early-season vs. late-season effects, which may influence both coaching changes and performance
+- **Venue**: Captures whether the match was played at home or away, which is a key contextual factor that affects both coaching decisions and outcomes
 
 ### Variables to Exclude Based on the DAG
-- **Start_Date and End_Date**: These are part of the treatment definition (coaching change) and should not be conditioned on directly.
-- **HomeTeam and AwayTeam**: Team identity is indirectly captured by **Team Strength**.
-- **Points**: As the outcome variable, it should not be conditioned on.
+- **Team Strength**: A mediator through which coaching changes influence performance. Conditioning on it would block part of the causal pathway
+- **Opponent Strength**: Also influenced by team dynamics and may serve as a mediator; excluding it preserves the total effect
+- **Start_Date and End_Date**: These are part of the treatment definition (used to determine when coaching changes occur) and should not be conditioned on directly
+- **HomeTeam and AwayTeam**: Team identity is indirectly captured by **Team Strength**
+- **Points**: As the outcome variable, it should not be conditioned on
 
 ---
+## EDA
 
 ```{.python}
 ## Simulation
 
 import numpy as np
 import polars as pl
-import seaborn as sns
 from sklearn.linear_model import LinearRegression
 
 np.random.seed(42)
 
-# True parameter values
-beta0 = 3   # Intercept
-beta1 = 2   # Effect of CoachChange
-beta2 = 5   # Effect of Team_Strength
-beta3 = -3  # Effect of Opponent_Strength
-beta4 = 1   # Effect of Match_Location
-n = 1000    # Sample size
-noise_sd = 2  # Standard deviation of random noise
+# True parameters
+beta0 = 3       # Intercept
+beta1 = 2       # Effect of CoachChange
+beta2 = 1.5     # Effect of Date (e.g., time in season)
+beta3 = 1       # Effect of Venue (1 = Home, 0 = Away)
+n = 1000
+noise_sd = 2
 
-# Simulate predictors directly
+# Simulate confounders and treatment
 sim_data = pl.DataFrame({
-    "CoachChange": np.random.choice([0, 1], size=n), 
-    "Team_Strength": np.random.uniform(50, 100, size=n),
-    "Opponent_Strength": np.random.uniform(50, 100, size=n),
-    "Match_Location": np.random.choice([0, 1], size=n)
+    "Date": np.random.uniform(1, 38, size=n),  # Simulating matchweek (1 to 38)
+    "Venue": np.random.choice([0, 1], size=n),  # 0 = Away, 1 = Home
 })
 
-# Simulate the outcome variable (Points) directly
+# Simulate CoachChange with some dependency on Date
+sim_data = sim_data.with_columns(
+    (pl.col("Date") > 19).cast(int).alias("CoachChange")  # More likely in mid/late season
+)
+
+# Simulate Points based on CoachChange + confounders
 sim_data = sim_data.with_columns([
     (
         beta0
         + beta1 * pl.col("CoachChange")
-        + beta2 * pl.col("Team_Strength")
-        + beta3 * pl.col("Opponent_Strength")
-        + beta4 * pl.col("Match_Location")
+        + beta2 * pl.col("Date")
+        + beta3 * pl.col("Venue")
         + np.random.normal(0, noise_sd, size=n)
     ).alias("Points")
 ])
 
-# Prepare the data for regression
-X = sim_data.select(["CoachChange", "Team_Strength", "Opponent_Strength", "Match_Location"]).to_numpy()
+# Prepare for regression
+X = sim_data.select(["CoachChange", "Date", "Venue"]).to_numpy()
 y = sim_data["Points"].to_numpy()
 
-# Fit the linear model
+# Fit linear model
 model = LinearRegression(fit_intercept=True)
 model.fit(X, y)
 
-# Print the coefficients
-print(f"Intercept: {model.intercept_}")
-print(f"Coefficients: {model.coef_}")
-
-# Compare to true parameter values
-print(f"True Intercept: {beta0}")
-print(f"True Coefficients: {beta1}, {beta2}, {beta3}, {beta4}")
+# Print estimated vs. true
+print(f"Estimated Intercept: {model.intercept_:.2f}")
+print(f"Estimated Coefficients: {model.coef_}")
+print(f"True Coefficients: [CoachChange: {beta1}, Date: {beta2}, Venue: {beta3}]")
 ```
 
 ---
@@ -191,15 +190,16 @@ print(df.describe())
 ```
 ```{.python}
 ### DISTRIBUTION PLOTS ###
-Points Distribution
+
+# Points Distribution
 plt.figure(figsize=(8, 5))
-sns.histplot(df["Points"], bins=3, kde=True)
+sns.histplot(df["Points"], bins=[-0.5, 0.5, 1.5, 3.5], discrete=True)
 plt.title("Distribution of Points")
-plt.xlabel("Points")
+plt.xlabel("Points (0 = Loss, 1 = Draw, 3 = Win)")
 plt.ylabel("Frequency")
 plt.show()
 
-Team Strength Distribution
+# Team Strength Distribution
 plt.figure(figsize=(8, 5))
 sns.histplot(df["Team_Strength"], bins=20, kde=True)
 plt.title("Distribution of Team Strength")
@@ -207,57 +207,76 @@ plt.xlabel("Squad Value (£M)")
 plt.ylabel("Frequency")
 plt.show()
 
-Opponent Strength Distribution
+# Opponent Strength Distribution
 plt.figure(figsize=(8, 5))
 sns.histplot(df["Opponent_Strength"], bins=20, kde=True)
 plt.title("Distribution of Opponent Strength")
-plt.xlabel("Squad Value (M)")
+plt.xlabel("Squad Value (£M)")
 plt.ylabel("Frequency")
 plt.show()
 
+venue_means = df.groupby("Venue")["Points"].mean()
+venue_means.plot(kind="bar", color=["#66c2a5", "#fc8d62"])
+plt.title("Average Points by Venue")
+plt.ylabel("Average Points")
+plt.xticks([0, 1], ["Away", "Home"])
+plt.ylim(0, 3)
+plt.show()
+
+
 ### CORRELATION ANALYSIS ###
 plt.figure(figsize=(10, 6))
-sns.heatmap(df[["Points", "Team_Strength", "Opponent_Strength", "CoachChange"]].corr(), annot=True, cmap="coolwarm", fmt=".2f")
+sns.heatmap(
+    df[["Points", "Team_Strength", "Opponent_Strength", "CoachChange"]].corr(),
+    annot=True,
+    cmap="coolwarm",
+    fmt=".2f"
+)
 plt.title("Correlation Heatmap")
 plt.show()
 
 ### CATEGORICAL ANALYSIS ###
-Countplot for Coaching Changes
+
+# Countplot for Coaching Changes
 plt.figure(figsize=(8, 5))
 sns.countplot(x="CoachChange", data=df, palette="Set2")
-plt.title("Distribution of Coaching Changes")
-plt.xlabel("Coach Change (0 = No, 1 = Yes)")
-plt.ylabel("Frequency")
+plt.title("Number of Matches With and Without a Coaching Change")
+plt.xlabel("Coach Change (0 = No Change, 1 = Change Before Match)")
+plt.ylabel("Number of Matches")
 plt.show()
 
-Points by Change Timing
-plt.figure(figsize=(10, 5))
-sns.boxplot(x="Change_Timing", y="Points", data=df, palette="Set1")
-plt.title("Points Distribution by Change Timing")
-plt.xlabel("Change Timing")
-plt.ylabel("Points Earned")
+timing_means = df.groupby("Change_Timing")["Points"].mean().sort_values()
+timing_means.plot(kind="bar", color=sns.color_palette("Set1"))
+plt.title("Average Points by Change Timing")
+plt.ylabel("Average Points")
+plt.xlabel("Timing of Coaching Change")
 plt.xticks(rotation=45)
+plt.ylim(0, 3)
 plt.show()
 ```
 
 ![](../figures/distribution_of_points.png){fig-align="center"}
 ![](../figures/distribution_of_team_strength.png){fig-align="center"}
 ![](../figures/distribution_of_opponent_strength.png){fig-align="center"}
+![](../figures/avg_points_by_venue.png){fig-align="center"}
 ![](../figures/correlation_heatmap.png){fig-align="center"}
-![](../figures/distribution_of_coaching_changes.png){fig-align="center"}
+![](../figures/num_of_matches_with_without_CC.png){fig-align="center"}
 ![](../figures/point_dist_by_change.png){fig-align="center"}
 
-- The **points distribution** confirms the expected trimodal pattern (0, 1, and 3 points), which aligns with how points are awarded in the Premier League.
+- The **points distribution** confirms the expected trimodal pattern (0, 1, and 3 points), aligning with the Premier League point system where a win earns 3 points, a draw earns 1, and a loss earns 0. The data shows an even spread of wins and losses, with fewer draws.
 
-- **Team strength and opponent strength distributions** show a right-skewed pattern, meaning a few teams have significantly higher squad values. Most teams fall within a mid-range, which supports using squad value as a proxy for team quality.
+- **Team strength and opponent strength distributions** reveal a right-skewed pattern. A few teams have extremely high squad values, while most are clustered in a mid-range. This supports using market value as a proxy for team quality, but also hints at inequality in team resources.
 
-- The **correlation heatmap** suggests that team strength has a moderate positive correlation (~0.20) with points, meaning stronger teams tend to perform better. Opponent strength has a negative correlation (~-0.28) with points, indicating tougher opponents make it harder to earn points. CoachChange has a weak negative correlation (~-0.10) with points, suggesting that a coaching change alone does not dramatically impact performance.
+- The **average points by venue** chart confirms home-field advantage: teams playing at home earn more points on average (around 1.6) compared to when they play away (around 1.2). This justifies including venue as a confounding variable in the causal model.
 
-- The **distribution of coaching changes** shows that most matches occurred without a coaching change (~500), while ~300 had a coaching change beforehand. This highlights that coaching changes are relatively rare in the dataset.
+- The **correlation heatmap** shows a modest positive relationship between team strength and points (~0.20), and a negative one between opponent strength and points (~-0.28). Coaching changes show a weaker negative correlation with points (~-0.10), suggesting limited direct influence.
 
-- The **points distribution by change timing** suggests that teams making mid-season coaching changes tend to perform worse, with a lower median number of points. Before-season and late-season changes appear to have a more balanced performance distribution.
+- The **distribution of coaching changes** shows that most matches were played without a recent coaching change (~500 games), while fewer (~260) had a coaching change beforehand. This reflects how coaching changes are relatively infrequent but not rare in the dataset.
 
-- Overall, the data indicates that team and opponent strength are stronger predictors of performance than coaching changes. Coaching changes may be a response to poor performance rather than a true intervention that improves outcomes.
+- The **average points by change timing** bar chart suggests that **mid-season coaching changes are associated with the lowest average points**, supporting the idea that they may be reactive (in response to poor form) rather than transformative. Teams that changed coaches before or late in the season performed similarly to teams that didn’t change coaches.
+
+- **Overall**, the data supports the idea that team strength and opponent difficulty are stronger performance drivers than coaching changes. Coaching switches appear more reactive than strategic.
+
 
 ---
 
@@ -267,15 +286,26 @@ import numpy as np
 import pandas as pd
 import pymc as pm
 import arviz as az
+from sklearn.preprocessing import StandardScaler
 
 # Load dataset
 df = pd.read_csv("/Users/alesandro/Downloads/matches_corrected.csv")
 
-# Convert 'Venue' to numeric (1 for Home, 0 for Away)
+# Convert 'Venue' to numeric (1 = Home, 0 = Away)
 df["Venue"] = df["Venue"].map({"Home": 1, "Away": 0})
 
-# Prepare data (predictors and outcome)
-X = df[["CoachChange", "Team_Strength", "Opponent_Strength", "Venue"]].to_numpy()
+# Convert 'Date' to numeric
+df["Date_numeric"] = pd.to_datetime(df["Date"], format="%m/%d/%Y").astype(int) / 10**9
+
+# Extract predictors
+X_raw = df[["CoachChange", "Date_numeric", "Venue"]].copy()
+
+# Standardize 'Date_numeric' and 'Venue', but leave 'CoachChange' as-is
+scaler = StandardScaler()
+X_raw[["Date_numeric", "Venue"]] = scaler.fit_transform(X_raw[["Date_numeric", "Venue"]])
+
+# Final arrays
+X = X_raw.to_numpy()
 y = df["Points"].to_numpy()
 
 # Bayesian model
@@ -285,22 +315,22 @@ with pm.Model() as coaching_model:
     y_data = pm.Data("y_data", y)
 
     # Priors
-    alpha = pm.Normal("alpha", mu=0, sigma=1)  # Intercept
-    beta = pm.Normal("beta", mu=0, sigma=1, shape=4)  # One for each predictor
-    sigma = pm.Exponential("sigma", lam=1)  # Standard deviation of error term
+    alpha = pm.Normal("alpha", mu=0, sigma=10)
+    beta = pm.Normal("beta", mu=0, sigma=5, shape=X.shape[1])
+    sigma = pm.Exponential("sigma", lam=1)
 
     # Likelihood
     mu = alpha + pm.math.dot(X_data, beta)
     y_obs = pm.Normal("y_obs", mu=mu, sigma=sigma, observed=y_data)
 
-    # Sample from the posterior
-    idata = pm.sample(1000, tune=1000, return_inferencedata=True)
+    # Sampling
+    idata = pm.sample(1000,tune=1000,return_inferencedata=True,target_accept=0.95,cores=1)
 
-# Summarize posterior estimates
+# Posterior summary
 summary = az.summary(idata, round_to=2)
 print(summary)
 
-# Visualize posterior distributions
+# Trace plots
 az.plot_trace(idata, combined=True)
 ```
 
