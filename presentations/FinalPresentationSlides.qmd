@@ -25,7 +25,7 @@ Why this project?
 
 ---
 
-### Causal Model (DAG)
+### DAG
 
 ![](../figures/FinalDag.png){fig-align="center"}
 
@@ -34,7 +34,7 @@ Why this project?
 ##### DAG Expanded
 
 - The DAG encodes assumptions about how different factors influence match performance (Points) and each other.
-- Coach affects Points indirectly, by influencing Team_Strength, which in turn shapes match outcomes. This reflects how a coach contributes to overall team development rather than immediate match-level tactics.
+- Coach affects Points indirectly through Team_Strength. This reflects how coaching influences performance over time (by developing players) rather than immediate match-level decisions.
 - Team_Strength then affects Points, making it a **mediator** in the causal path from Coach to Points.
 - Opponent_Strength affects Points because tougher opponents reduce the chance of earning points. It is treated as **external and fixed** for each match.
 - Team influences Coach, Venue, Team_Strength, and Points because each club’s structure, resources, and identity affect hiring decisions, home-field designation, and outcomes.
