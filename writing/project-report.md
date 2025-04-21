@@ -395,6 +395,42 @@ data-fig-align="center" />
     # Trace plots
     az.plot_trace(idata, combined=True)
 
+### Estimating the Causal Effect
+
+- To estimate the effect of coaching changes on performance, I built a
+  model that accounts for when the match was played, where it was
+  played, and which team was involved.
+
+### What the Model Included
+
+The model considered:
+
+- CoachChange: whether the team had recently changed coaches (**this is
+  the main variable of interest**)
+- Date: when in the season the match was played
+- Venue: whether the team was playing home or away
+- Team: the team name, to account for differences in team quality (like
+  Manchester United vs. Ipswich Town)
+
+### What the Model Found
+
+- The average effect of a coaching change was about **−0.94 points per
+  match**.
+- This means teams that changed coaches tended to earn **slightly fewer
+  points** than those that didn’t.
+- However, the model also found that the true effect could range
+  **anywhere from −4.41 to +2.01 points**.
+
+### How to Interpret That
+
+- The range above is called a **credible interval**. It tells us where
+  the true effect is likely to fall based on the data.
+- Because the range **includes 0**, we can’t say for sure that coaching
+  changes help or hurt, the data just doesn’t give a clear answer.
+- In simple terms: **coaching changes don’t seem to consistently improve
+  results**, and in some cases, they may be a response to deeper
+  problems the coach can’t fix.
+
 ## Intermediate Slide Presentation
 
 See my intermediate presentation
@@ -559,3 +595,8 @@ and venue. It’s not a local comparison like in RDD, but it still gives a
 sense of how outcomes shift, on average, when a team replaces their
 coach. So while RDD doesn’t really fit this context, marginal effects
 still offer meaningful insight.
+
+## Final Slide Presentation
+
+See my Final presentation
+\[slides\]https://github.com/Alesandro-Rodriguez/is5150-ar/blob/milestone11/presentations/FinalPresentationSlides.html
