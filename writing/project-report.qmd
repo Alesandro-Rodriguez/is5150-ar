@@ -7,15 +7,11 @@ format: gfm
 
 This project aims to analyze the causal impact of coaching changes on team performances during the 2023-2024 Premier League Season. Using a dataset of match outcomes and coaching history, the analysis leverages regression techniques to infer causality.
 
----
-
 ## The Story
 
 This project investigates the impact of mid-season head coaching changes on team performance in the 2023–2024 Premier League season. Coaching changes are often made in response to underperformance, but it’s unclear whether they lead to measurable improvements in outcomes like win percentage or league ranking.
 
 The goal of this project is to analyze whether coaching changes improve team performance and evaluate the extent of their impact. The findings will provide insights into whether these changes justify their cost and strategic importance.
-
----
 
 ## Ideal Dataset
 
@@ -28,8 +24,6 @@ The analysis uses the following data:
    - **Opponent Strength**: League ranking or historical performance of opposing teams.
    - **Match Context**: Home vs. away games and timing relative to the coaching change.
 
----
-
 ## Factors Affecting Outcomes
 
 Performance is influenced by several factors:
@@ -39,8 +33,6 @@ Performance is influenced by several factors:
 - **Timing**: Early-season changes allow time for recovery, while late-season changes are often last-resort measures.
 - **Player Quality**: The adaptability and skill of the players affects results.
 - **Opponent Strength**: Performance depends on the difficulty of the opposing teams.
-
----
 
 ## Addressing Feedback
 
@@ -67,19 +59,13 @@ Performance is influenced by several factors:
   - Match location (home vs. away).
   - Timing of coaching changes (early vs. late season).
 
----
-
 ## Theory
 
 Coaching changes are typically a response to poor results. This project examines whether these changes improve team performance or if outcomes are primarily driven by other factors, such as team quality or opponent difficulty. By controlling for these variables, the analysis aims to estimate the true impact of coaching changes.
 
----
-
 ## DAG
 
-![](figures/UpdatedDag.png){fig-align="center"}
-
----
+![](../figures/FinalDag.png){fig-align="center"}
 
 ## Identification Strategy
 
@@ -88,57 +74,99 @@ The objective of this project is to analyze the causal impact of coaching change
 
 ### Where We Are Going
 The goal of this milestone is to specify an identification strategy that ensures:
-- Key confounding variables are included to satisfy the **backdoor criterion**.
-- Irrelevant variables are excluded to streamline the model.
-- Decisions are based on sound **causal assumptions** supported by the DAG.
+
+- Key confounding variables are included to satisfy the **backdoor criterion**
+- Irrelevant variables are excluded to streamline the model
+- Decisions are based on sound **causal assumptions** supported by the DAG
 
 ### Variables to Include Based on the DAG
-- **Team Strength**: Captures the quality of the team, which influences both the likelihood of a coaching change and performance outcomes.
-- **Opponent Strength**: Reflects the difficulty of the opposing team, which impacts match outcomes and adjusts for match context.
-- **Match Location**: Accounts for the home or away setting, which influences team performance.
-- **Date**: Controls for temporal trends and seasonality, such as early-season vs. late-season effects.
+- **Date**: Captures seasonal timing effects that influence both coaching changes and performance.
+- **Venue**: Home-field advantage influences match outcomes but is independent of coaching changes.
+- **Team**: Controls for underlying club-specific factors (such as structure, budget, and talent) that affect both coaching decisions and match outcomes.
 
 ### Variables to Exclude Based on the DAG
-- **Start_Date and End_Date**: These are part of the treatment definition (coaching change) and should not be conditioned on directly.
-- **HomeTeam and AwayTeam**: Team identity is indirectly captured by **Team Strength**.
-- **Points**: As the outcome variable, it should not be conditioned on.
+- **Team Strength**: A mediator through which coaching changes influence performance. Conditioning on it would block part of the causal pathway
+- **Opponent Strength**: Also influenced by team dynamics and may serve as a mediator; excluding it preserves the total effect
+- **Start_Date and End_Date**: These are part of the treatment definition (used to determine when coaching changes occur) and should not be conditioned on directly
+- **HomeTeam and AwayTeam**: Team identity is adjusted for via the Team variable.
+- **Points**: As the outcome variable, it should not be conditioned on
 
----
+## Simulation
 
+```
 ## Simulation
 
 import numpy as np
 import polars as pl
-import seaborn as sns
 from sklearn.linear_model import LinearRegression
 
 np.random.seed(42)
 
-# Define true parameter values
-beta0 = 3  
-beta1 = 2  
-beta2 = 5  
-beta3 = -3  
-beta4 = 1  
-n = 1000  
-noise_sd = 2  
+# True parameters
+beta0 = 3       # Intercept
+beta1 = 2       # Effect of CoachChange
+beta2 = 1.5     # Effect of Date (e.g., time in season)
+n = 1000
+noise_sd = 2
 
-# Simulate predictors
-sim_data = (
-    pl.DataFrame({
-        "CoachChange": np.random.choice([0, 1], size=n),  
-        "Opponent_Strength": np.random.uniform(50, 100, size=n),  
-        "Match_Location": np.random.choice([0, 1], size=n)  
-    })
-    .with_columns([
-        (beta0 + beta1 * pl.col("CoachChange") + np.random.normal(0, noise_sd, size=n)).alias("Team_Strength")
-    ])
-    .with_columns([
-        (beta2 * pl.col("Team_Strength") + beta3 * pl.col("Opponent_Strength") + beta4 * pl.col("Match_Location") + np.random.normal(0, noise_sd, size=n)).alias("Points")
-    ])
+# 20 teams
+n_teams = 20
+team_ids = np.random.choice(range(n_teams), size=n)
+
+# Create random true team effects
+true_team_effects = np.random.normal(0, 1, size=n_teams)
+
+# Simulate confounders and treatment
+sim_data = pl.DataFrame({
+    "Date": np.random.uniform(1, 38, size=n),
+    "Team": team_ids,
+})
+
+# Simulate CoachChange with some dependency on Date
+sim_data = sim_data.with_columns(
+    (pl.col("Date") > 19).cast(int).alias("CoachChange")
 )
 
----
+# --- KEY FIX HERE ---
+# Simulate Points using map_elements instead of apply
+sim_data = sim_data.with_columns(
+    (
+        beta0
+        + beta1 * pl.col("CoachChange")
+        + beta2 * pl.col("Date")
+        + pl.col("Team").map_elements(lambda t: true_team_effects[int(t)], return_dtype=pl.Float64)
+        + np.random.normal(0, noise_sd, size=n)
+    ).alias("Points")
+)
+
+# Prepare predictors for regression
+X = sim_data.select(["CoachChange", "Date"]).to_numpy()
+
+# One-hot encode Team (dropping first team to avoid multicollinearity)
+team_one_hot = np.zeros((n, n_teams - 1))
+for i in range(n):
+    team_idx = team_ids[i]
+    if team_idx != 0:  # drop first team
+        team_one_hot[i, team_idx - 1] = 1
+
+# Combine predictors
+X = np.hstack([X, team_one_hot])
+y = sim_data["Points"].to_numpy()
+
+# Fit linear model
+model = LinearRegression(fit_intercept=True)
+model.fit(X, y)
+
+# Print estimated vs. true
+print(f"Estimated Intercept: {model.intercept_:.2f}")
+print(f"Estimated Coefficients for [CoachChange, Date]: {model.coef_[:2]}")
+print(f"True Coefficients: [CoachChange: {beta1}, Date: {beta2}]")
+
+```
+
+## EDA
+
+```
 # EDA
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -163,17 +191,20 @@ print(df.isnull().sum())
 Summary statistics
 print("\nSummary Statistics:")
 print(df.describe())
+```
 
+```
 ### DISTRIBUTION PLOTS ###
-Points Distribution
+
+# Points Distribution
 plt.figure(figsize=(8, 5))
-sns.histplot(df["Points"], bins=3, kde=True)
+sns.histplot(df["Points"], bins=[-0.5, 0.5, 1.5, 3.5], discrete=True)
 plt.title("Distribution of Points")
-plt.xlabel("Points")
+plt.xlabel("Points (0 = Loss, 1 = Draw, 3 = Win)")
 plt.ylabel("Frequency")
 plt.show()
 
-Team Strength Distribution
+# Team Strength Distribution
 plt.figure(figsize=(8, 5))
 sns.histplot(df["Team_Strength"], bins=20, kde=True)
 plt.title("Distribution of Team Strength")
@@ -181,34 +212,238 @@ plt.xlabel("Squad Value (£M)")
 plt.ylabel("Frequency")
 plt.show()
 
-Opponent Strength Distribution
+# Opponent Strength Distribution
 plt.figure(figsize=(8, 5))
 sns.histplot(df["Opponent_Strength"], bins=20, kde=True)
 plt.title("Distribution of Opponent Strength")
-plt.xlabel("Squad Value (M)")
+plt.xlabel("Squad Value (£M)")
 plt.ylabel("Frequency")
 plt.show()
 
+venue_means = df.groupby("Venue")["Points"].mean()
+venue_means.plot(kind="bar", color=["#66c2a5", "#fc8d62"])
+plt.title("Average Points by Venue")
+plt.ylabel("Average Points")
+plt.xticks([0, 1], ["Away", "Home"])
+plt.ylim(0, 3)
+plt.show()
+
+
 ### CORRELATION ANALYSIS ###
 plt.figure(figsize=(10, 6))
-sns.heatmap(df[["Points", "Team_Strength", "Opponent_Strength", "CoachChange"]].corr(), annot=True, cmap="coolwarm", fmt=".2f")
+sns.heatmap(
+    df[["Points", "Team_Strength", "Opponent_Strength", "CoachChange"]].corr(),
+    annot=True,
+    cmap="coolwarm",
+    fmt=".2f"
+)
 plt.title("Correlation Heatmap")
 plt.show()
 
 ### CATEGORICAL ANALYSIS ###
-Countplot for Coaching Changes
+
+# Countplot for Coaching Changes
 plt.figure(figsize=(8, 5))
 sns.countplot(x="CoachChange", data=df, palette="Set2")
-plt.title("Distribution of Coaching Changes")
-plt.xlabel("Coach Change (0 = No, 1 = Yes)")
-plt.ylabel("Frequency")
+plt.title("Number of Matches With and Without a Coaching Change")
+plt.xlabel("Coach Change (0 = No Change, 1 = Change Before Match)")
+plt.ylabel("Number of Matches")
 plt.show()
 
-Points by Change Timing
-plt.figure(figsize=(10, 5))
-sns.boxplot(x="Change_Timing", y="Points", data=df, palette="Set1")
-plt.title("Points Distribution by Change Timing")
-plt.xlabel("Change Timing")
-plt.ylabel("Points Earned")
+timing_means = df.groupby("Change_Timing")["Points"].mean().sort_values()
+timing_means.plot(kind="bar", color=sns.color_palette("Set1"))
+plt.title("Average Points by Change Timing")
+plt.ylabel("Average Points")
+plt.xlabel("Timing of Coaching Change")
 plt.xticks(rotation=45)
+plt.ylim(0, 3)
 plt.show()
+```
+
+![](../figures/distribution_of_points.png){fig-align="center"}
+![](../figures/distribution_of_team_strength.png){fig-align="center"}
+![](../figures/distribution_of_opponent_strength.png){fig-align="center"}
+![](../figures/avg_points_by_venue.png){fig-align="center"}
+![](../figures/correlation_heatmap.png){fig-align="center"}
+![](../figures/num_of_matches_with_without_CC.png){fig-align="center"}
+![](../figures/point_dist_by_change.png){fig-align="center"}
+
+- The **points distribution** confirms the expected trimodal pattern (0, 1, and 3 points), aligning with the Premier League point system where a win earns 3 points, a draw earns 1, and a loss earns 0. The data shows an even spread of wins and losses, with fewer draws.
+
+- **Team strength and opponent strength distributions** reveal a right-skewed pattern. A few teams have extremely high squad values, while most are clustered in a mid-range. This supports using market value as a proxy for team quality, but also hints at inequality in team resources.
+
+- The **average points by venue** chart confirms home-field advantage: teams playing at home earn more points on average (around 1.6) compared to when they play away (around 1.2). This justifies including venue as a confounding variable in the causal model.
+
+- The **correlation heatmap** shows a modest positive relationship between team strength and points (~ 0.20), and a negative one between opponent strength and points (~ -0.28). Coaching changes show a weaker negative correlation with points (~ -0.10), suggesting limited direct influence.
+
+- The **distribution of coaching changes** shows that most matches were played without a recent coaching change (~ 500 games), while fewer (~ 260) had a coaching change beforehand. This reflects how coaching changes are relatively infrequent but not rare in the dataset.
+
+- The **average points by change timing** bar chart suggests that **mid-season coaching changes are associated with the lowest average points**, supporting the idea that they may be reactive (in response to poor form) rather than transformative. Teams that changed coaches before or late in the season performed similarly to teams that didn’t change coaches.
+
+- **Overall**, the data supports the idea that team strength and opponent difficulty are stronger performance drivers than coaching changes. Coaching switches appear more reactive than strategic.
+
+## Estimate Causal Effect
+
+```
+import numpy as np
+import pandas as pd
+import pymc as pm
+import arviz as az
+from sklearn.preprocessing import StandardScaler
+
+# Load dataset
+df = pd.read_csv("/Users/alesandro/Downloads/matches_corrected.csv")
+
+# Convert 'Venue' to numeric (1 = Home, 0 = Away)
+df["Venue"] = df["Venue"].map({"Home": 1, "Away": 0})
+
+# Convert 'Date' to numeric
+df["Date_numeric"] = pd.to_datetime(df["Date"], format="%m/%d/%Y").astype(int) / 10**9
+
+# One-hot encode Team (drop first to avoid multicollinearity)
+team_dummies = pd.get_dummies(df["Team"], prefix="Team", drop_first=True)
+
+# Combine all predictors: CoachChange, Date, Venue, Team dummies
+X_raw = pd.concat([
+    df[["CoachChange", "Date_numeric", "Venue"]],
+    team_dummies
+], axis=1)
+
+# Standardize Date and Venue only
+scaler = StandardScaler()
+X_raw[["Date_numeric", "Venue"]] = scaler.fit_transform(X_raw[["Date_numeric", "Venue"]])
+
+# Final arrays
+X = X_raw.astype(float).to_numpy()
+y = df["Points"].to_numpy()
+
+# Bayesian model
+with pm.Model() as coaching_model:
+    X_data = pm.Data("X_data", X)
+    y_data = pm.Data("y_data", y)
+
+    # Priors
+    alpha = pm.Normal("alpha", mu=0, sigma=10)
+    beta = pm.Normal("beta", mu=0, sigma=5, shape=X.shape[1])
+    sigma = pm.Exponential("sigma", lam=1)
+
+    # Likelihood
+    mu = alpha + pm.math.dot(X_data, beta)
+    y_obs = pm.Normal("y_obs", mu=mu, sigma=sigma, observed=y_data)
+
+    # Sampling
+    idata = pm.sample(1000, tune=1000, return_inferencedata=True, target_accept=0.95, cores=1)
+
+# Posterior summary
+summary = az.summary(idata, round_to=2)
+print(summary)
+
+# Trace plots
+az.plot_trace(idata, combined=True)
+```
+
+### Estimating the Causal Effect
+
+- To estimate the effect of coaching changes on performance, I built a model that accounts for when the match was played, where it was played, and which team was involved.
+
+### What the Model Included
+
+The model considered:
+
+- CoachChange: whether the team had recently changed coaches (**this is the main variable of interest**)
+- Date: when in the season the match was played
+- Venue: whether the team was playing home or away
+- Team: the team name, to account for differences in team quality (like Manchester United vs. Ipswich Town)
+
+### What the Model Found
+
+- The average effect of a coaching change was about **−0.94 points per match**.
+- This means teams that changed coaches tended to earn **slightly fewer points** than those that didn’t.
+- However, the model also found that the true effect could range **anywhere from −4.41 to +2.01 points**.
+
+### How to Interpret That
+
+- The range above is called a **credible interval**. It tells us where the true effect is likely to fall based on the data.
+- Because the range **includes 0**, we can’t say for sure that coaching changes help or hurt, the data just doesn’t give a clear answer.
+- In simple terms: **coaching changes don’t seem to consistently improve results**, and in some cases, they may be a response to deeper problems the coach can’t fix.
+
+## Intermediate Slide Presentation
+
+See my [Intermediate Presentation Slides](https://github.com/Alesandro-Rodriguez/is5150-ar/blob/main/presentations/intermediate-presentation.html)
+
+## Conjoint Analysis
+
+As a supplemental milestone, I conducted a conjoint analysis survey to explore how people prioritize different soccer team management strategies. The goal was to better understand how strategic decisions—such as how a team is built, trained, and managed—shape perceptions of team performance. This ties back to the larger theme of evaluating interventions in soccer, with coaching changes being one example.
+
+The survey asked respondents to choose between hypothetical team profiles. Each profile varied along five key attributes: squad selection strategy, training approach, match strategy, use of technology, and player conditioning.
+
+### Attribute importance
+
+Squad selection was the most influential attribute in respondents’ choices, accounting for over 40% of decision weight. Match strategy was next, followed by tech usage and training approach. Player conditioning was considered the least important.
+
+![](../figures/CBC1 - Attribute importance Chart.png){fig-align="center"}
+
+### Squad selection
+
+Data-driven scouting was the most preferred option by a wide margin. Youth academy focus and superstar transfers were also viewed positively, while fan-voted player signings were rated the least effective.
+
+![](../figures/CBC1 - Squad Selection Chart.png){fig-align="center"}
+
+### Training approach
+
+Respondents favored high-intensity workloads. Rest and recovery-focused approaches received negative scores, suggesting performance was prioritized over recovery. Traditional and AI-optimized training had little effect either way.
+
+![](../figures/CBC1 - Training Approach Chart.png){fig-align="center"}
+
+### Match strategy
+
+Possession-based play was the top tactical preference. High-press strategies were somewhat favored, while counter-attacks and defensive-focused play (park-the-bus) were seen as undesirable.
+
+![](../figures/CBC1 - Match Strategy Chart.png){fig-align="center"}
+
+### Tech usage
+
+Real-time opponent analysis had the highest score. Wearable performance tracking also scored positively. On the other hand, AI-powered substitutions were rated very negatively, suggesting skepticism toward automation in in-game decisions.
+
+![](../figures/CBC1 - Tech Usage Chart.png){fig-align="center"}
+
+### Player conditioning
+
+The most preferred approaches were self-regulated by players and year-round intensive training. Recovery-first and strict rotation systems scored negatively, further indicating a leaning toward performance over rest.
+
+![](../figures/CBC1 - Player Conditioning Chart.png){fig-align="center"}
+
+### Summary
+
+This analysis provides an early look at how different types of team management decisions are perceived. While coaching changes are the focal point of the main project, this exercise highlights that how a team is built and managed—particularly in terms of squad strategy and tactics—carries significant weight in how people judge potential performance. It also shows hesitation around relying too heavily on automation and AI in match-day decisions.
+
+## Difference-in-Differences Consideration
+
+One method I considered for estimating the impact of coaching changes was the difference-in-differences (DiD) strategy. This approach compares changes in outcomes for a treatment group (teams with a coaching change) and a control group (teams without a change) over time. The goal is to isolate the effect of the intervention by observing how the two groups evolve from a shared baseline to a shared post-treatment period.
+
+In the context of the Premier League, however, DiD presents some limitations. Matches occur on different days and coaching changes happen at various points in the season. As a result, there is no uniform pre- and post-period that applies to all teams. This violates one of DiD’s core requirements: a clearly defined and consistent treatment time. Additionally, the parallel trends assumption—expecting both groups to follow similar trajectories in the absence of treatment—is unlikely to hold given the competitive structure and variability in matchups across the season.
+
+### Summary
+
+While DiD is commonly used in policy and economics studies, I don't think this aligns well with this project. The variation in timing and complexity of scheduling in professional soccer introduces challenges that make this approach less suitable.
+
+### Matching Strategy Consideration
+
+As part of this milestone, I evaluated whether a matching strategy could be used to estimate the causal effect of mid-season coaching changes on team performance. Matching methods are often used to approximate randomized experiments by pairing treated and untreated units with similar characteristics. However, applying this approach requires conditioning on pre-treatment covariates that affect both the treatment assignment and the outcome.
+
+In my project, two key confounders—team strength and opponent strength—are considered mediators in the causal diagram. Including them in a matching procedure would block part of the pathway through which coaching changes influence team performance, violating the goal of estimating the total effect. At the same time, excluding these variables would leave important backdoor paths unblocked, undermining the validity of the matching procedure altogether.
+
+While matching is technically feasible with the dataset, it is not appropriate for the identification strategy I’ve chosen. Because the strategy is designed to isolate the total effect without conditioning on mediators, a regression-based or Bayesian model is better suited for estimating the impact of coaching changes. Matching would either bias the estimate or fail to address confounding properly in this context.
+
+## Consider Regression Discontinuity and Marginal Effects
+
+For this milestone, I looked into whether regression discontinuity or marginal effects could work to estimate the impact of mid-season coaching changes on team performance. RDD typically works best when treatment is assigned based on a clear cutoff in a continuous variable, like age or test scores. In my case, there isn’t a universal rule or threshold that triggers a coaching change. These decisions are made by each club based on a mix of factors that aren’t consistent across teams or situations.
+
+I thought about using something like league position or recent results as a running variable, but coaching changes don’t always happen at the same point for everyone. Some teams switch coaches after a few losses, others wait much longer. Since there’s no shared cutoff that determines when the treatment kicks in, the main assumption behind RDD doesn’t hold here.
+
+That said, marginal effects are still useful. The Bayesian model I ran includes coaching changes as a predictor, so I can interpret the average effect of a change on team performance, controlling for things like date and venue. It’s not a local comparison like in RDD, but it still gives a sense of how outcomes shift, on average, when a team replaces their coach. So while RDD doesn’t really fit this context, marginal effects still offer meaningful insight.
+
+## Final Slide Presentation
+
+See my [Final Presentation Slides](https://github.com/Alesandro-Rodriguez/is5150-ar/blob/milestone11/presentations/FinalPresentationSlides.html)
+
