@@ -121,12 +121,13 @@ ensures:
 
 ### Variables to Include Based on the DAG
 
-- **Date**: Controls for temporal trends and seasonality, such as
-  early-season vs. late-season effects, which may influence both
-  coaching changes and performance
-- **Venue**: Captures whether the match was played at home or away,
-  which is a key contextual factor that affects both coaching decisions
-  and outcomes
+- **Date**: Captures seasonal timing effects that influence both
+  coaching changes and performance.
+- **Venue**: Home-field advantage influences match outcomes but is
+  independent of coaching changes.
+- **Team**: Controls for underlying club-specific factors (such as
+  structure, budget, and talent) that affect both coaching decisions and
+  match outcomes.
 
 ### Variables to Exclude Based on the DAG
 
@@ -137,8 +138,8 @@ ensures:
 - **Start_Date and End_Date**: These are part of the treatment
   definition (used to determine when coaching changes occur) and should
   not be conditioned on directly
-- **HomeTeam and AwayTeam**: Team identity is indirectly captured by
-  **Team Strength**
+- **HomeTeam and AwayTeam**: Team identity is adjusted for via the Team
+  variable.
 - **Points**: As the outcome variable, it should not be conditioned on
 
 ## Simulation
@@ -155,34 +156,51 @@ ensures:
     beta0 = 3       # Intercept
     beta1 = 2       # Effect of CoachChange
     beta2 = 1.5     # Effect of Date (e.g., time in season)
-    beta3 = 1       # Effect of Venue (1 = Home, 0 = Away)
     n = 1000
     noise_sd = 2
 
+    # 20 teams
+    n_teams = 20
+    team_ids = np.random.choice(range(n_teams), size=n)
+
+    # Create random true team effects
+    true_team_effects = np.random.normal(0, 1, size=n_teams)
+
     # Simulate confounders and treatment
     sim_data = pl.DataFrame({
-        "Date": np.random.uniform(1, 38, size=n),  # Simulating matchweek (1 to 38)
-        "Venue": np.random.choice([0, 1], size=n),  # 0 = Away, 1 = Home
+        "Date": np.random.uniform(1, 38, size=n),
+        "Team": team_ids,
     })
 
     # Simulate CoachChange with some dependency on Date
     sim_data = sim_data.with_columns(
-        (pl.col("Date") > 19).cast(int).alias("CoachChange")  # More likely in mid/late season
+        (pl.col("Date") > 19).cast(int).alias("CoachChange")
     )
 
-    # Simulate Points based on CoachChange + confounders
-    sim_data = sim_data.with_columns([
+    # --- KEY FIX HERE ---
+    # Simulate Points using map_elements instead of apply
+    sim_data = sim_data.with_columns(
         (
             beta0
             + beta1 * pl.col("CoachChange")
             + beta2 * pl.col("Date")
-            + beta3 * pl.col("Venue")
+            + pl.col("Team").map_elements(lambda t: true_team_effects[int(t)], return_dtype=pl.Float64)
             + np.random.normal(0, noise_sd, size=n)
         ).alias("Points")
-    ])
+    )
 
-    # Prepare for regression
-    X = sim_data.select(["CoachChange", "Date", "Venue"]).to_numpy()
+    # Prepare predictors for regression
+    X = sim_data.select(["CoachChange", "Date"]).to_numpy()
+
+    # One-hot encode Team (dropping first team to avoid multicollinearity)
+    team_one_hot = np.zeros((n, n_teams - 1))
+    for i in range(n):
+        team_idx = team_ids[i]
+        if team_idx != 0:  # drop first team
+            team_one_hot[i, team_idx - 1] = 1
+
+    # Combine predictors
+    X = np.hstack([X, team_one_hot])
     y = sim_data["Points"].to_numpy()
 
     # Fit linear model
@@ -191,8 +209,8 @@ ensures:
 
     # Print estimated vs. true
     print(f"Estimated Intercept: {model.intercept_:.2f}")
-    print(f"Estimated Coefficients: {model.coef_}")
-    print(f"True Coefficients: [CoachChange: {beta1}, Date: {beta2}, Venue: {beta3}]")
+    print(f"Estimated Coefficients for [CoachChange, Date]: {model.coef_[:2]}")
+    print(f"True Coefficients: [CoachChange: {beta1}, Date: {beta2}]")
 
 ## EDA
 
@@ -316,14 +334,14 @@ data-fig-align="center" />
   venue as a confounding variable in the causal model.
 
 - The **correlation heatmap** shows a modest positive relationship
-  between team strength and points (~0.20), and a negative one between
-  opponent strength and points (~-0.28). Coaching changes show a weaker
-  negative correlation with points (~-0.10), suggesting limited direct
+  between team strength and points (~ 0.20), and a negative one between
+  opponent strength and points (~ -0.28). Coaching changes show a weaker
+  negative correlation with points (~ -0.10), suggesting limited direct
   influence.
 
 - The **distribution of coaching changes** shows that most matches were
-  played without a recent coaching change (~500 games), while fewer
-  (~260) had a coaching change beforehand. This reflects how coaching
+  played without a recent coaching change (~ 500 games), while fewer
+  (~ 260) had a coaching change beforehand. This reflects how coaching
   changes are relatively infrequent but not rare in the dataset.
 
 - The **average points by change timing** bar chart suggests that
@@ -433,8 +451,8 @@ The model considered:
 
 ## Intermediate Slide Presentation
 
-See my intermediate presentation
-\[slides\]https://github.com/Alesandro-Rodriguez/is5150-ar/blob/main/presentations/intermediate-presentation.html
+See my [Intermediate Presentation
+Slides](https://github.com/Alesandro-Rodriguez/is5150-ar/blob/main/presentations/intermediate-presentation.html)
 
 ## Conjoint Analysis
 
@@ -598,5 +616,5 @@ still offer meaningful insight.
 
 ## Final Slide Presentation
 
-See my Final presentation
-\[slides\]https://github.com/Alesandro-Rodriguez/is5150-ar/blob/milestone11/presentations/FinalPresentationSlides.html
+See my [Final Presentation
+Slides](https://github.com/Alesandro-Rodriguez/is5150-ar/blob/milestone11/presentations/FinalPresentationSlides.html)
